@@ -1,7 +1,40 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <title>ѧѦ ѧ  ︵͡︵  ̢ ̱ ̧̱ι̵̱̊ι̶̨̱ ̶̱   ︵ Ѧѧ  ︵͡ ︵   ѧ Ѧ    ̵̗̊o̵̖  ︵  ѦѦ ѧ </title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            color: #007FFF;/* Updated color */
+            text-align: left;
+            display: flex;
+            align-items: flex-start; /* Top justify the content */
+            justify-content: left;
+            padding: 20px; /* Padding for top and left */
+        }
+
+        /* Blinking Block Cursor Styles */
+        .blinking-cursor {
+            font-weight: bold;
+            font-size: 20px;
+            color: #007FFF;/* Updated color */
+            opacity: 1;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
 <body>
-<h1>Hello World</h1>
-<p>I'm hosted with GitHub Pages.</p>
+    <span>The future is <span class="blinking-cursor">█</span></span>
+    <script>
+        // Optional: Focus on the webpage for keyboard interactions
+        window.onload = function() { window.focus(); };
+    </script>
 </body>
 </html>
