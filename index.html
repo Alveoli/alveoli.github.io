@@ -1,40 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ѧѦ ѧ  ︵͡︵  ̢ ̱ ̧̱ι̵̱̊ι̶̨̱ ̶̱   ︵ Ѧѧ  ︵͡ ︵   ѧ Ѧ    ̵̗̊o̵̖  ︵  ѦѦ ѧ </title>
+    <title>Ski Game</title>
     <style>
         body {
             font-family: 'Courier New', monospace;
             margin: 0;
             padding: 0;
             background-color: black;
-            color: #007FFF;/* Updated color */
-            text-align: left;
-            display: flex;
-            align-items: flex-start; /* Top justify the content */
-            justify-content: left;
-            padding: 20px; /* Padding for top and left */
+            text-align: center;
         }
 
-        /* Blinking Block Cursor Styles */
+        #introContainer {
+            text-align: left;
+            padding: 20px;
+            color: #007FFF; /* Azure color for the intro text */
+        }
+
         .blinking-cursor {
             font-weight: bold;
             font-size: 20px;
-            color: #007FFF;/* Updated color */
+            color: #007FFF; /* Azure color */
             opacity: 1;
             animation: blink 1s step-end infinite;
+            cursor: pointer;
         }
 
         @keyframes blink {
             50% { opacity: 0; }
         }
+
+        #skiGame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+        }
+
+        .control-button {
+            position: fixed;
+            bottom: 20px;
+            width: 60px;
+            height: 60px;
+            font-size: 30px;
+            display: none;
+        }
+
+        #leftButton {
+            left: 20px;
+        }
+
+        #rightButton {
+            right: 20px;
+        }
+
+        #gameTitle {
+            display: none;
+            font-size: 24px;
+            color: white;
+            margin-top: 10px;
+        }
     </style>
+
+<!-- Attribution: thanks for sounds effects from Manuel Graf freesound.org -->
+<audio id="ouchSound" src="ouch.wav" preload="auto"></audio>
+
 </head>
 <body>
-    <span>The future is <span class="blinking-cursor">█</span></span>
-    <script>
-        // Optional: Focus on the webpage for keyboard interactions
-        window.onload = function() { window.focus(); };
-    </script>
+    <div id="introContainer">
+        <span id="introText">The future is <span class="blinking-cursor">█</span></span>
+    </div>
+    <div id="gameTitle">❄️ The future is SKI!!! ⛄</div>
+    <canvas id="skiGame"></canvas>
+    <button id="leftButton" class="control-button">👈</button>
+    <button id="rightButton" class="control-button">👉</button>
+    <script src="skiGame.js"></script>
 </body>
 </html>
