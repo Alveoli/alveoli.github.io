@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Egg Catcher 🥚🏀</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      color: #333;
+      margin: 20px 0;
+    }
+    canvas {
+      border: 2px solid #888;
+      background: #f0f8ff;
+      display: block;
+      margin: 0 auto;
+      touch-action: none; /* prevent scrolling on touch */
+    }
+    #message {
+      margin-top: 12px;
+      min-height: 1.5em;
+      font-size: 1.1em;
+    }
+    p {
+      color: #555;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Egg Catcher 🥚🏀</h1>
+  <p>Use ← / → keys or drag your finger on the canvas to move the basket. Catch 5 eggs!</p>
+  <canvas id="game" width="400" height="300"></canvas>
+  <div id="message"></div>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const message = document.getElementById('message');
+
+      // Basket setup
+      const basket = {
+        width: 60,
+        height: 20,
+        x: canvas.width/2 - 30,
+        y: canvas.height - 30,
+        speed: 5,
+        vx: 0
+      };
+
+      const eggs = [];
+      let score = 0;
+      let gameOver = false;
+
+      // Spawn an egg every second
+      const spawnInterval = setInterval(() => {
+        if (gameOver) return;
+        const x = Math.random() * (canvas.width - 20) + 10;
+        const speed = Math.random() * 2 + 1;
+        eggs.push({ x, y: 0, r: 10, speed });
+      }, 1000);
+
+      function drawBasket() {
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+      }
+
+      function drawEgg(e) {
+        ctx.beginPath();
+        ctx.fillStyle = 'gold';
+        ctx.ellipse(e.x, e.y, e.r * 0.8, e.r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      function update() {
+        if (gameOver) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Move basket by velocity
+        basket.x += basket.vx;
+        // Clamp
+        basket.x = Math.max(0, Math.min(canvas.width - basket.width, basket.x));
+        drawBasket();
+
+        // Move & draw eggs
+        for (let i = eggs.length - 1; i >= 0; i--) {
+          const egg = eggs[i];
+          egg.y += egg.speed;
+          drawEgg(egg);
+
+          // caught?
+          if (
+            egg.y + egg.r >= basket.y &&
+            egg.x > basket.x &&
+            egg.x < basket.x + basket.width
+          ) {
+            eggs.splice(i, 1);
+            score++;
+            message.textContent = `Caught an egg… score: ${score}`;
+            if (score >= 5) endGame();
+          }
+          // missed
+          else if (egg.y - egg.r > canvas.height) {
+            eggs.splice(i, 1);
+          }
+        }
+
+        requestAnimationFrame(update);
+      }
+
+      function endGame() {
+        gameOver = true;
+        clearInterval(spawnInterval);
+        message.textContent =
+          '🎉 Well done! Your clue: "Brings your homework to and fro"';
+      }
+
+      // Keyboard controls
+      document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft') basket.vx = -basket.speed;
+        if (e.key === 'ArrowRight') basket.vx = basket.speed;
+      });
+      document.addEventListener('keyup', e => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          basket.vx = 0;
+        }
+      });
+
+      // Touch controls: drag or tap to move basket
+      function moveBasketTouch(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left - basket.width / 2;
+        basket.x = Math.max(0, Math.min(canvas.width - basket.width, x));
+      }
+      canvas.addEventListener('touchstart', moveBasketTouch);
+      canvas.addEventListener('touchmove', moveBasketTouch);
+
+      // Start the game loop
+      update();
+    })();
+  </script>
+</body>
+</html>
