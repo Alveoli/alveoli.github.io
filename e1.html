@@ -43,7 +43,7 @@
 
       // Basket setup
       const basket = {
-        width: 60,
+        width: 30,
         height: 20,
         x: canvas.width/2 - 30,
         y: canvas.height - 30,
@@ -59,7 +59,7 @@
       const spawnInterval = setInterval(() => {
         if (gameOver) return;
         const x = Math.random() * (canvas.width - 20) + 10;
-        const speed = Math.random() * 2 + 1;
+        const speed = Math.random() * 6 + 3;
         eggs.push({ x, y: 0, r: 10, speed });
       }, 1000);
 
