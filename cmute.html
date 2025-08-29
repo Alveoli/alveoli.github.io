@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>London Commute — text-only notice board</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 16px; font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    .muted { opacity: .7; }
+    .wrap { max-width: 900px; }
+    button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid currentColor; background: transparent; cursor: pointer; }
+    .top { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <button id="refresh">Refresh</button>
+      <span class="muted">Live TfL data · client-side only</span>
+    </div>
+    <pre id="board">Loading…</pre>
+  </div>
+
+<script>
+/*
+  London Commute App — text-only notice board (single-file, GitHub Pages ready)
+
+  - Zero inputs, zero UI. Each refresh fetches live data from the TfL Unified API.
+  - Support: Tube, Elizabeth line, Buses (buses used only for ETA/status context).
+  - Journeys + times are hard-coded, mirroring the original Python.
+  - Output intentionally very terse. Commented-out Python features are *omitted* here too.
+*/
+
+// ---------------------------------------------------------------------------
+// CONFIG (hard-coded, no env files)
+// ---------------------------------------------------------------------------
+const TFL_APP_KEY_PRIMARY = "b9c520a7e4d64f42a6fc96c35bcad1fd"; // provided
+const TFL_BASE = "https://api.tfl.gov.uk";
+
+// Line IDs
+const LINE_ELIZABETH = "elizabeth";
+const LINE_DISTRICT = "district";
+const LINE_PICCADILLY = "piccadilly";
+const BUS_LINES = ["e2", "e7", "e8", "e11", "sl8"];
+
+// StopPoint IDs
+const STOP_WEST_EALING_ELIZ = "910GWEALING";
+const STOP_EALING_BROADWAY_ELIZ = "910GEALINGB"; // kept for completeness
+const STOP_EALING_BROADWAY_TUBE = "940GZZLUEBY";
+const STOP_NORTH_EALING_TUBE = "940GZZLUNEN";
+const STOP_HAMMERSMITH_DIST_PICC = "940GZZLUHSD";
+const STOP_RAVENSCOURT_PARK = "940GZZLURVP"; // kept for completeness
+
+// Conservative walking times (minutes) from home to first stations
+const WALK_HOME_TO_WEST_EALING_MIN = 12;
+const WALK_HOME_TO_EALING_BROADWAY_MIN = 20;
+const WALK_HOME_TO_NORTH_EALING_MIN = 25;
+
+// School last-hop walks (minutes)
+const WALK_HAMMERSMITH_TO_SCHOOL_MIN = 10;
+const WALK_RAVENSCOURT_TO_SCHOOL_MIN = 9; // not used in active routes
+
+// Final hop home (if walking)
+const WALK_EALING_BROADWAY_TO_HOME_MIN = 20;
+const WALK_WEST_EALING_TO_HOME_MIN = 12;
+
+// Avg bus ETA components (used only for return ETAs)
+const AVG_BUS_WAIT_MIN = 4;
+const BUS_EALING_BROADWAY_TO_HOME_MIN = 10;
+const BUS_WEST_EALING_TO_HOME_MIN = 6;
+
+// Interchange & ride minutes (conservative)
+const IV_WEST_EALING_TO_EALING_BROADWAY_ELIZ_MIN = 2;
+const CHANGE_AT_EALING_BROADWAY_MIN = 3;
+const IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN = 16;
+const IV_EALING_BROADWAY_TO_RAVENSCOURT_DIST_MIN = 15; // not used in active routes
+const IV_NORTH_EALING_TO_HAMMERSMITH_PICC_MIN = 14;
+
+// Buffer used for catchability in original code — not shown in output
+const CATCH_BUFFER_MIN = 2;
+
+// Number of first-mode departures per route
+const N_NEXT = 5;
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+const LONDON_TZ = "Europe/London";
+
+function nowLondon() {
+  return new Date(); // calculations are relative; formatting uses Europe/London explicitly
+}
+
+function fmtHHMM(date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: LONDON_TZ
+  }).format(date);
+}
+
+function minutesBetween(a, b) {
+  const ms = b.getTime() - a.getTime();
+  return Math.max(0, Math.round(ms / 60000));
+}
+
+function addMinutes(date, mins) {
+  return new Date(date.getTime() + mins * 60000);
+}
+
+// ---------------------------------------------------------------------------
+// TfL API wrappers
+// ---------------------------------------------------------------------------
+async function tflGet(path, params = {}) {
+  const url = new URL(TFL_BASE + path);
+  const allParams = { ...params };
+  if (TFL_APP_KEY_PRIMARY) allParams.app_key = TFL_APP_KEY_PRIMARY;
+  Object.entries(allParams).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), { mode: "cors" });
+  if (!res.ok) throw new Error(`TfL ${path} ${res.status}`);
+  return res.json();
+}
+
+async function getFirstModeDepartures(stopPointId, lineFilter, directionKeyword, n = N_NEXT) {
+  const arr = await tflGet(`/StopPoint/${encodeURIComponent(stopPointId)}/Arrivals`);
+  const _now = nowLondon();
+
+  function filter(withDirection) {
+    const out = [];
+    for (const p of arr) {
+      try {
+        if ((p.lineId || "").toLowerCase() !== lineFilter.toLowerCase()) continue;
+        const plat = (p.platformName || "").toLowerCase();
+        if (withDirection && directionKeyword && !plat.includes(directionKeyword.toLowerCase())) continue;
+        const secs = Number(p.timeToStation || 0);
+        const when = new Date(_now.getTime() + secs * 1000);
+        out.push({
+          line_id: p.lineId || "",
+          direction_text: p.platformName || p.direction || "",
+          when,
+          seconds_to: secs,
+          catchable: false
+        });
+      } catch { /* skip */ }
+    }
+    out.sort((a, b) => a.seconds_to - b.seconds_to);
+    return out.slice(0, n);
+  }
+
+  let filtered = filter(true);
+  if (!filtered.length) filtered = filter(false);
+  return filtered;
+}
+
+async function getLineStatuses(lineIds) {
+  if (!lineIds.length) return {};
+  const idsCsv = lineIds.join(",");
+  const data = await tflGet(`/Line/${encodeURIComponent(idsCsv)}/Status`, { detail: "false" });
+  const out = {};
+  try {
+    for (const item of data) {
+      const lid = (item.id || "").toLowerCase();
+      const statuses = item.lineStatuses || [];
+      const short = statuses.length ? (statuses[0].statusSeverityDescription || "Unknown") : "Unknown";
+      out[lid] = { line_id: lid, short };
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Route model
+// ---------------------------------------------------------------------------
+function Leg(label, minutes) { return { label, minutes }; }
+
+function RouteVariant(cfg) {
+  Object.assign(this, cfg);
+}
+RouteVariant.prototype.eta_if_boarding = function(departAt) {
+  const now = nowLondon();
+  const waitMin = minutesBetween(now, departAt);
+  const legsMin = (this.legs_after_boarding || []).reduce((sum, l) => sum + l.minutes, 0);
+  const totalMin = this.walk_from_home_min + waitMin + legsMin;
+  return addMinutes(now, totalMin);
+};
+RouteVariant.prototype.catchable = function(departAt) {
+  const now = nowLondon();
+  const minsUntil = minutesBetween(now, departAt);
+  return minsUntil >= (this.walk_from_home_min + CATCH_BUFFER_MIN);
+};
+
+// Active routes only (commented-out Python routes are *not* included)
+const MORNING_ROUTES = [
+  new RouteVariant({
+    code: "A1",
+    title: "WE (DIST)",
+    first_mode_stop_id: STOP_WEST_EALING_ELIZ,
+    first_mode_line: LINE_ELIZABETH,
+    first_mode_dir_keyword: "eastbound",
+    walk_from_home_min: WALK_HOME_TO_WEST_EALING_MIN,
+    legs_after_boarding: [
+      Leg("Ride: West Ealing → Ealing Broadway (Elizabeth)", IV_WEST_EALING_TO_EALING_BROADWAY_ELIZ_MIN),
+      Leg("Change at Ealing Broadway", CHANGE_AT_EALING_BROADWAY_MIN),
+      Leg("Ride: Ealing Broadway → Hammersmith (District)", IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN),
+      Leg("Walk: Hammersmith → School", WALK_HAMMERSMITH_TO_SCHOOL_MIN),
+    ],
+    lines_used: [LINE_ELIZABETH, LINE_DISTRICT],
+    last_hop: "School via Hammersmith",
+  }),
+  new RouteVariant({
+    code: "B1",
+    title: "EB (DIST)",
+    first_mode_stop_id: STOP_EALING_BROADWAY_TUBE,
+    first_mode_line: LINE_DISTRICT,
+    first_mode_dir_keyword: "eastbound",
+    walk_from_home_min: WALK_HOME_TO_EALING_BROADWAY_MIN,
+    legs_after_boarding: [
+      Leg("Ride: Ealing Broadway → Hammersmith (District)", IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN),
+      Leg("Walk: Hammersmith → School", WALK_HAMMERSMITH_TO_SCHOOL_MIN),
+    ],
+    lines_used: [LINE_DISTRICT],
+    last_hop: "School via Hammersmith",
+  }),
+  new RouteVariant({
+    code: "C1",
+    title: "NE (PICC)",
+    first_mode_stop_id: STOP_NORTH_EALING_TUBE,
+    first_mode_line: LINE_PICCADILLY,
+    first_mode_dir_keyword: "eastbound",
+    walk_from_home_min: WALK_HOME_TO_NORTH_EALING_MIN,
+    legs_after_boarding: [
+      Leg("Ride: North Ealing → Hammersmith (Piccadilly)", IV_NORTH_EALING_TO_HAMMERSMITH_PICC_MIN),
+      Leg("Walk: Hammersmith → School", WALK_HAMMERSMITH_TO_SCHOOL_MIN),
+    ],
+    lines_used: [LINE_PICCADILLY],
+    last_hop: "School via Hammersmith",
+  }),
+];
+
+const RETURN_ROUTES = [
+  new RouteVariant({
+    code: "R2",
+    title: "HAM>EB (DIST)",
+    first_mode_stop_id: STOP_HAMMERSMITH_DIST_PICC,
+    first_mode_line: LINE_DISTRICT,
+    first_mode_dir_keyword: "westbound",
+    walk_from_home_min: 0,
+    legs_after_boarding: [
+      Leg("Ride: Hammersmith → Ealing Broadway (District)", IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN),
+      Leg("Wait for a bus (avg)", AVG_BUS_WAIT_MIN),
+      Leg("Bus: Ealing Broadway → Home (avg)", BUS_EALING_BROADWAY_TO_HOME_MIN),
+    ],
+    lines_used: [LINE_DISTRICT, ...BUS_LINES],
+    last_hop: "Home (bus)",
+  }),
+  new RouteVariant({
+    code: "R3",
+    title: "HAM>WE (DIST)",
+    first_mode_stop_id: STOP_HAMMERSMITH_DIST_PICC,
+    first_mode_line: LINE_DISTRICT,
+    first_mode_dir_keyword: "westbound",
+    walk_from_home_min: 0,
+    legs_after_boarding: [
+      Leg("Ride: Hammersmith → Ealing Broadway (District)", IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN),
+      Leg("Change at Ealing Broadway", CHANGE_AT_EALING_BROADWAY_MIN),
+      Leg("Ride: Ealing Broadway → West Ealing (Elizabeth)", IV_WEST_EALING_TO_EALING_BROADWAY_ELIZ_MIN),
+      Leg("Walk: West Ealing → Home", WALK_WEST_EALING_TO_HOME_MIN),
+    ],
+    lines_used: [LINE_DISTRICT, LINE_ELIZABETH],
+    last_hop: "Home via West Ealing (walk)",
+  }),
+];
+
+// sanity check (mirrors Python assert)
+if (!(IV_EALING_BROADWAY_TO_HAMMERSMITH_DIST_MIN > 0 && IV_NORTH_EALING_TO_HAMMERSMITH_PICC_MIN > 0)) {
+  throw new Error("Fixed minutes cannot be zero");
+}
+
+// ---------------------------------------------------------------------------
+// Output builder (keeps text very light)
+// ---------------------------------------------------------------------------
+async function buildSectionForRoutes(title, routes) {
+  const out = [];
+  out.push(title);
+  out.push("-".repeat(title.length));
+
+  // collect unique line ids for status
+  const uniqueLines = [];
+  for (const r of routes) {
+    for (const lid of r.lines_used) {
+      if (!uniqueLines.includes(lid)) uniqueLines.push(lid);
+    }
+  }
+  const statuses = await getLineStatuses(uniqueLines);
+
+  for (const r of routes) {
+    const deps = await getFirstModeDepartures(
+      r.first_mode_stop_id,
+      r.first_mode_line,
+      r.first_mode_dir_keyword,
+      N_NEXT
+    );
+
+    // annotate catchable (not printed per spec)
+    for (const d of deps) d.catchable = r.catchable(d.when);
+
+    out.push(`${r.title}`);
+
+    // Status (only if not Good Service)
+    const disrupted = [];
+    for (const lid of r.lines_used) {
+      const st = statuses[lid];
+      if (st && (st.short || "").toLowerCase() !== "good service") {
+        disrupted.push(`${lid.charAt(0).toUpperCase() + lid.slice(1)}: ${st.short} ⚠️`);
+      }
+    }
+    if (disrupted.length) out.push(`🚦 Status: ${disrupted.join(" | ")}`);
+
+    // First mode departures
+    if (deps.length) {
+      const now = nowLondon();
+      const depTxts = deps.map(d => {
+        const mins = minutesBetween(now, d.when);
+        const t = fmtHHMM(d.when);
+        const tick = ""; // catchable icons intentionally removed
+        return `${t} (${mins}m) ${tick}`.trim();
+      });
+      out.push(`🚆 Next: ${depTxts.join("  |  ")}`);
+    } else {
+      out.push("First train: no live data 😕");
+    }
+
+    // ETAs
+    if (deps.length) {
+      const etaTxts = deps.map(d => fmtHHMM(r.eta_if_boarding(d.when)));
+      out.push(`🎯 ETA: ${etaTxts.join("  |  ")}`);
+    } else {
+      out.push("ETAs: —");
+    }
+
+    out.push(""); // blank line between routes
+  }
+
+  return out.join("\n");
+}
+
+async function buildNoticeText() {
+  const nowTxt = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short", day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: LONDON_TZ
+  }).format(nowLondon());
+
+  const parts = [];
+  parts.push(`Generated: ${nowTxt}`);
+  parts.push(await buildSectionForRoutes("MORNING 🌞🚸", MORNING_ROUTES));
+  parts.push(await buildSectionForRoutes("RETURN 🌙🏠", RETURN_ROUTES));
+  return parts.join("\n");
+}
+
+async function runNoticeBoard() {
+  try {
+    return await buildNoticeText();
+  } catch (err) {
+    console.error(err);
+    return "(Error building notice board — check console)";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
+async function render() {
+  const pre = document.getElementById("board");
+  pre.textContent = "Loading…";
+  pre.textContent = await runNoticeBoard();
+}
+document.getElementById("refresh").addEventListener("click", render);
+render();
+
+</script>
+</body>
+</html>
