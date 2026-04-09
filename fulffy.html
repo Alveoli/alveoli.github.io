@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bunny Knight's Easter Trail</title>
+  <style>
+    :root {
+      --bg1: #fff8fc;
+      --bg2: #eefbf2;
+      --ink: #5f4b53;
+      --panel: rgba(255,255,255,0.88);
+      --pink: #ffd3e8;
+      --pink-strong: #ff9fc8;
+      --mint: #dff7e8;
+      --grass: #cceccb;
+      --flower: #ffe89e;
+      --shadow: rgba(95,75,83,0.15);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .app {
+      width: min(760px, 100%);
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: max(12px, env(safe-area-inset-top)) 14px 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.72));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 6px 18px var(--shadow);
+    }
+
+    .title {
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .title span:last-child {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      background: var(--panel);
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 800;
+      box-shadow: 0 8px 18px var(--shadow);
+      white-space: nowrap;
+    }
+
+    .content {
+      padding: 14px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 2px solid rgba(255,255,255,0.95);
+      border-radius: 24px;
+      box-shadow: 0 14px 28px var(--shadow);
+      padding: 14px;
+    }
+
+    .intro {
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .board-wrap {
+      display: grid;
+      place-items: center;
+      overflow: auto;
+    }
+
+    .board {
+      display: grid;
+      gap: 8px;
+      margin-inline: auto;
+      touch-action: manipulation;
+    }
+
+    .tile {
+      width: min(16.8vw, 72px);
+      height: min(16.8vw, 72px);
+      min-width: 52px;
+      min-height: 52px;
+      border: 0;
+      border-radius: 18px;
+      font-size: clamp(18px, 4.8vw, 28px);
+      position: relative;
+      box-shadow: inset 0 -5px 0 rgba(255,255,255,0.35), 0 8px 14px rgba(95,75,83,0.08);
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f6fff7, #e2f7e8);
+    }
+
+    .tile.dark {
+      background: linear-gradient(180deg, #eff9ef, #d8f0dd);
+    }
+
+    .tile.blocked {
+      background: linear-gradient(180deg, #fcecf4, #f7dce8);
+      opacity: 0.95;
+    }
+
+    .tile.valid {
+      outline: 4px solid rgba(255, 159, 200, 0.42);
+      transform: scale(1.02);
+    }
+
+    .tile.selected {
+      outline: 4px solid rgba(255, 196, 0, 0.4);
+    }
+
+    .tile:active { transform: scale(0.985); }
+
+    .tile .steps {
+      position: absolute;
+      top: 4px;
+      right: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      opacity: 0.52;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .controls button,
+    .cta {
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+      background: linear-gradient(180deg, #fff0f7, #ffe1ef);
+      box-shadow: 0 10px 18px var(--shadow);
+    }
+
+    .secondary {
+      background: linear-gradient(180deg, #f5fff7, #e6f8ea) !important;
+    }
+
+    .footer-space {
+      height: calc(10px + env(safe-area-inset-bottom));
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255,249,252,0.72), rgba(239,252,244,0.85));
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .card {
+      width: min(560px, 100%);
+      background: rgba(255,255,255,0.93);
+      border-radius: 28px;
+      border: 2px solid rgba(255,255,255,0.95);
+      box-shadow: 0 22px 42px rgba(95,75,83,0.18);
+      padding: 22px 18px;
+      text-align: center;
+    }
+
+    h1, h2, h3 { margin: 8px 0 10px; line-height: 1.1; }
+    p { margin: 8px 0; line-height: 1.45; }
+    .big-emoji { font-size: 48px; }
+    .clue-box {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff7d6, #ffeeb0);
+      font-size: 18px;
+      font-weight: 800;
+      word-break: break-word;
+    }
+    .small-note { font-size: 14px; opacity: 0.8; }
+
+    @media (min-width: 700px) {
+      .tile {
+        width: 78px;
+        height: 78px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title"><span>🐇♘🥚</span><span>Bunny Knight's Easter Trail</span></div>
+      <div class="hud">
+        <div class="pill" id="levelPill">Burrow 1 / 3</div>
+        <div class="pill" id="movesPill">Hops 0</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="panel intro" id="introPanel">
+        Guide the bunny like a knight in chess. Each move must be an <strong>L-shape</strong>: two squares one way and one square the other. Collect every egg, then land on the basket. Thoughtful beats frantic. A welcome change, frankly.
+      </div>
+
+      <div class="panel board-wrap">
+        <div class="board" id="board" aria-label="Puzzle board"></div>
+      </div>
+
+      <div class="panel">
+        <div id="levelText"><strong>Burrow 1:</strong> Collect all eggs, then finish on the basket.</div>
+        <div style="height:10px"></div>
+        <div class="controls">
+          <button id="undoBtn" class="secondary">↩️ Undo</button>
+          <button id="restartBtn" class="secondary">🔄 Restart burrow</button>
+          <button id="hintBtn">💡 Show valid hops</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-space"></div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="big-emoji">🌸🐣🌼</div>
+      <h1>Bunny Knight's Easter Trail</h1>
+      <p>Three tiny spring puzzles. Tap a square to move the bunny in a chess knight jump. Collect every egg in each burrow, then finish in the basket.</p>
+      <p>The bunny is clever. You are hopefully cleverer.</p>
+      <p class="small-note">Need a reminder? Valid knight jumps will glow softly when you tap the hint button.</p>
+      <button class="cta" id="startBtn">Start puzzling</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="winOverlay" hidden>
+    <div class="card">
+      <div class="big-emoji">🎉🧺🥚</div>
+      <h2>Trail complete!</h2>
+      <p>You guided the bunny through every burrow and collected every egg. Very tidy work.</p>
+      <div class="clue-box" id="clueText"></div>
+      <button class="cta" id="playAgainBtn">Play again</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================
+    // Easy-to-edit settings
+    // =========================================
+    const WIN_CLUE = "Where outdoor clothes are kept!";
+    const GAME_TITLE = "Bunny Knight's Easter Trail";
+    const SHOW_STEP_NUMBERS = false;
+    const LEVELS = [
+      {
+        name: "Burrow 1",
+        rows: 5,
+        cols: 5,
+        bunny: [4, 0],
+        basket: [0, 3],
+        eggs: [[2, 1], [1, 3], [3, 4]],
+        blocked: [[3, 2], [1, 1]],
+        par: 4
+      },
+      {
+        name: "Burrow 2",
+        rows: 5,
+        cols: 5,
+        bunny: [4, 1],
+        basket: [3, 3],
+        eggs: [[2, 0], [0, 1], [1, 3], [4, 4]],
+        blocked: [[2, 2], [0, 4]],
+        par: 5
+      },
+      {
+        name: "Burrow 3",
+        rows: 6,
+        cols: 6,
+        bunny: [5, 0],
+        basket: [2, 4],
+        eggs: [[3, 1], [1, 0], [0, 2], [4, 5], [3, 3]],
+        blocked: [[2, 2], [5, 2], [1, 4]],
+        par: 6
+      }
+    ];
+
+    // =========================================
+    // State
+    // =========================================
+    document.title = GAME_TITLE;
+
+    const boardEl = document.getElementById("board");
+    const levelPill = document.getElementById("levelPill");
+    const movesPill = document.getElementById("movesPill");
+    const levelText = document.getElementById("levelText");
+    const startOverlay = document.getElementById("startOverlay");
+    const winOverlay = document.getElementById("winOverlay");
+    const clueText = document.getElementById("clueText");
+
+    const moveDeltas = [
+      [-2, -1], [-2, 1],
+      [-1, -2], [-1, 2],
+      [1, -2], [1, 2],
+      [2, -1], [2, 1]
+    ];
+
+    let levelIndex = 0;
+    let state = null;
+    let showHints = true;
+
+    function makeState(index) {
+      const level = LEVELS[index];
+      return {
+        bunny: [...level.bunny],
+        collectedEggs: [],
+        moveCount: 0,
+        history: [],
+        flashMessage: ""
+      };
+    }
+
+    function posKey(pos) {
+      return `${pos[0]},${pos[1]}`;
+    }
+
+    function isBlocked(level, pos) {
+      return level.blocked.some(cell => cell[0] === pos[0] && cell[1] === pos[1]);
+    }
+
+    function isEggCollected(pos) {
+      return state.collectedEggs.includes(posKey(pos));
+    }
+
+    function isEggAt(level, pos) {
+      return level.eggs.some(cell => cell[0] === pos[0] && cell[1] === pos[1]);
+    }
+
+    function isBasket(level, pos) {
+      return level.basket[0] === pos[0] && level.basket[1] === pos[1];
+    }
+
+    function validMoves(level, from) {
+      return moveDeltas
+        .map(([dr, dc]) => [from[0] + dr, from[1] + dc])
+        .filter(([r, c]) => r >= 0 && c >= 0 && r < level.rows && c < level.cols)
+        .filter(pos => !isBlocked(level, pos));
+    }
+
+    function currentLevel() {
+      return LEVELS[levelIndex];
+    }
+
+    function updateHud() {
+      const level = currentLevel();
+      levelPill.textContent = `${level.name} / ${LEVELS.length}`;
+      movesPill.textContent = `Hops ${state.moveCount}`;
+      const eggsLeft = level.eggs.length - state.collectedEggs.length;
+      const basketNeed = eggsLeft === 0 ? "Now hop to the basket." : `${eggsLeft} egg${eggsLeft === 1 ? "" : "s"} left.`;
+      levelText.innerHTML = `<strong>${level.name}:</strong> Move like a chess knight. ${basketNeed}`;
+    }
+
+    function renderBoard() {
+      const level = currentLevel();
+      const valid = validMoves(level, state.bunny).map(posKey);
+      boardEl.style.gridTemplateColumns = `repeat(${level.cols}, minmax(52px, 1fr))`;
+      boardEl.innerHTML = "";
+
+      for (let r = 0; r < level.rows; r++) {
+        for (let c = 0; c < level.cols; c++) {
+          const pos = [r, c];
+          const key = posKey(pos);
+          const button = document.createElement("button");
+          const dark = (r + c) % 2 === 1;
+          button.className = `tile ${dark ? "dark" : ""}`;
+          button.type = "button";
+          button.dataset.r = r;
+          button.dataset.c = c;
+          button.setAttribute("aria-label", `Row ${r + 1}, column ${c + 1}`);
+
+          if (isBlocked(level, pos)) {
+            button.classList.add("blocked");
+            button.textContent = "🌷";
+            button.disabled = true;
+          } else if (state.bunny[0] === r && state.bunny[1] === c) {
+            button.classList.add("selected");
+            button.textContent = "🐇";
+          } else if (isBasket(level, pos)) {
+            button.textContent = level.eggs.length === state.collectedEggs.length ? "🧺" : "🪺";
+          } else if (isEggAt(level, pos) && !isEggCollected(pos)) {
+            button.textContent = "🥚";
+          } else {
+            button.textContent = dark ? "🌿" : "·";
+            button.style.opacity = dark ? "0.68" : "0.42";
+          }
+
+          if (showHints && valid.includes(key) && !(state.bunny[0] === r && state.bunny[1] === c)) {
+            button.classList.add("valid");
+          }
+
+          if (SHOW_STEP_NUMBERS && !isBlocked(level, pos)) {
+            const step = document.createElement("span");
+            step.className = "steps";
+            step.textContent = `${r + 1},${c + 1}`;
+            button.appendChild(step);
+          }
+
+          if (!button.disabled) {
+            button.addEventListener("click", () => tryMove([r, c]));
+          }
+          boardEl.appendChild(button);
+        }
+      }
+
+      updateHud();
+    }
+
+    function tryMove(target) {
+      const level = currentLevel();
+      const valid = validMoves(level, state.bunny).map(posKey);
+      if (!valid.includes(posKey(target))) {
+        wiggleBoard();
+        return;
+      }
+
+      state.history.push({
+        bunny: [...state.bunny],
+        collectedEggs: [...state.collectedEggs],
+        moveCount: state.moveCount
+      });
+
+      state.bunny = [...target];
+      state.moveCount++;
+
+      if (isEggAt(level, target) && !isEggCollected(target)) {
+        state.collectedEggs.push(posKey(target));
+      }
+
+      renderBoard();
+      checkLevelComplete();
+    }
+
+    function checkLevelComplete() {
+      const level = currentLevel();
+      const allEggs = state.collectedEggs.length === level.eggs.length;
+      const onBasket = isBasket(level, state.bunny);
+      if (!(allEggs && onBasket)) return;
+
+      if (levelIndex < LEVELS.length - 1) {
+        setTimeout(() => {
+          levelIndex++;
+          state = makeState(levelIndex);
+          renderBoard();
+        }, 320);
+      } else {
+        setTimeout(() => {
+          clueText.textContent = WIN_CLUE;
+          winOverlay.hidden = false;
+        }, 320);
+      }
+    }
+
+    function undoMove() {
+      if (!state || state.history.length === 0) return;
+      const previous = state.history.pop();
+      state.bunny = previous.bunny;
+      state.collectedEggs = previous.collectedEggs;
+      state.moveCount = previous.moveCount;
+      renderBoard();
+    }
+
+    function restartLevel() {
+      state = makeState(levelIndex);
+      renderBoard();
+    }
+
+    function wiggleBoard() {
+      boardEl.animate(
+        [
+          { transform: "translateX(0px)" },
+          { transform: "translateX(-5px)" },
+          { transform: "translateX(5px)" },
+          { transform: "translateX(0px)" }
+        ],
+        { duration: 180, easing: "ease-out" }
+      );
+    }
+
+    function startGame() {
+      levelIndex = 0;
+      state = makeState(levelIndex);
+      showHints = true;
+      startOverlay.hidden = true;
+      winOverlay.hidden = true;
+      clueText.textContent = WIN_CLUE;
+      renderBoard();
+    }
+
+    document.getElementById("startBtn").addEventListener("click", startGame);
+    document.getElementById("playAgainBtn").addEventListener("click", startGame);
+    document.getElementById("undoBtn").addEventListener("click", undoMove);
+    document.getElementById("restartBtn").addEventListener("click", restartLevel);
+    document.getElementById("hintBtn").addEventListener("click", () => {
+      showHints = !showHints;
+      document.getElementById("hintBtn").textContent = showHints ? "💡 Hide hop glow" : "💡 Show valid hops";
+      renderBoard();
+    });
+
+    state = makeState(levelIndex);
+    renderBoard();
+  </script>
+</body>
+</html>
