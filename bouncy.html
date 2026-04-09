@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bunny Bounce Egg Hunt</title>
+  <style>
+    :root {
+      --bg1: #fff7fb;
+      --bg2: #eefaf1;
+      --panel: rgba(255,255,255,0.86);
+      --ink: #5f4b53;
+      --pink: #ffb7d5;
+      --pink-deep: #ff7eb9;
+      --mint: #b8f1cc;
+      --lilac: #d9cbff;
+      --butter: #ffeaa7;
+      --shadow: rgba(95, 75, 83, 0.16);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(180deg, var(--bg1), var(--bg2));
+      color: var(--ink);
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .app {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: max(12px, env(safe-area-inset-top)) 14px 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.65));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 6px 20px var(--shadow);
+      z-index: 5;
+    }
+
+    .brand {
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .hud {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      background: var(--panel);
+      border: 2px solid rgba(255,255,255,0.75);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 700;
+      box-shadow: 0 8px 18px var(--shadow);
+      white-space: nowrap;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      background: linear-gradient(180deg, #fcecff 0%, #fff8f1 58%, #ecf9ee 100%);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: end;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .control-cluster {
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .right-cluster { justify-content: flex-end; }
+
+    .btn {
+      border: 0;
+      border-radius: 22px;
+      min-width: 78px;
+      min-height: 72px;
+      padding: 0 18px;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--ink);
+      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.78));
+      box-shadow: 0 10px 18px var(--shadow), inset 0 -6px 0 rgba(255,255,255,0.5);
+      border: 2px solid rgba(255,255,255,0.9);
+      user-select: none;
+    }
+
+    .btn:active,
+    .btn.active {
+      transform: translateY(2px) scale(0.985);
+      box-shadow: 0 5px 12px var(--shadow), inset 0 4px 10px rgba(0,0,0,0.06);
+    }
+
+    .btn.jump {
+      min-width: 96px;
+      background: linear-gradient(180deg, #fff0f7, #ffe5f1);
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(255,248,252,0.7), rgba(240,253,244,0.8));
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .card {
+      width: min(560px, 100%);
+      background: rgba(255,255,255,0.92);
+      border: 2px solid rgba(255,255,255,0.95);
+      border-radius: 28px;
+      padding: 22px 18px;
+      box-shadow: 0 20px 40px rgba(95,75,83,0.18);
+      text-align: center;
+    }
+
+    h1, h2 { margin: 6px 0 10px; line-height: 1.1; }
+    p { margin: 8px 0; font-size: 17px; line-height: 1.4; }
+
+    .big-emoji { font-size: 48px; }
+
+    .card .cta {
+      margin-top: 14px;
+      border: 0;
+      border-radius: 18px;
+      padding: 14px 18px;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--ink);
+      background: linear-gradient(180deg, #ffe5f1, #ffd5ea);
+      box-shadow: 0 10px 18px var(--shadow);
+      min-width: 180px;
+    }
+
+    .clue-box {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff8d5, #fff0b2);
+      font-weight: 800;
+      font-size: 18px;
+      word-break: break-word;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.7);
+    }
+
+    .tiny {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    @media (min-width: 900px) {
+      .controls { padding-left: 22px; padding-right: 22px; }
+      .btn { min-width: 90px; min-height: 78px; }
+    }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand"><span>🐰🥚</span><span>Bunny Bounce Egg Hunt</span></div>
+      <div class="hud">
+        <div class="pill" id="eggCounter">Eggs 0 / 0</div>
+        <div class="pill" id="tipText">Collect the eggs, then hop into the basket.</div>
+      </div>
+    </div>
+
+    <canvas id="gameCanvas" aria-label="Platform game canvas"></canvas>
+
+    <div class="controls" aria-label="Touch controls">
+      <div class="control-cluster left-cluster">
+        <button class="btn" data-control="left" aria-label="Move left">⬅️</button>
+        <button class="btn" data-control="right" aria-label="Move right">➡️</button>
+      </div>
+      <div></div>
+      <div class="control-cluster right-cluster">
+        <button class="btn jump" data-control="jump" aria-label="Jump">⬆️ Hop</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="big-emoji">🌷🐣🥚</div>
+      <h1>Bunny Bounce Egg Hunt</h1>
+      <p>You are a determined little bunny on an extremely serious mission: collect every Easter egg and leap into the basket at the end.</p>
+      <p><strong>How to play:</strong> use the big buttons to move and hop. The jumps are forgiving because this is Easter, not military training.</p>
+      <p class="tiny">Tip: after you collect all the eggs, the basket ribbon turns green.</p>
+      <button class="cta" id="startBtn">Start hopping</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="winOverlay" hidden>
+    <div class="card">
+      <div class="big-emoji">🎀🐰🎉</div>
+      <h2>You did it!</h2>
+      <p>Every egg has been rescued. The bunny is smug. Fair enough.</p>
+      <div class="clue-box" id="clueText"></div>
+      <button class="cta" id="playAgainBtn">Play again</button>
+    </div>
+  </div>
+
+    <script>
+    // =========================================
+    // Easy-to-edit settings
+    // =========================================
+    const WIN_CLUE = "I'm thirsty! Get me one of these first";
+    const GAME_TITLE = "Bunny Bounce Egg Hunt";
+    const SHOW_KEYBOARD_SUPPORT = true; // Optional extra for desktop testing
+    const PLAYER_SPEED = 6.0;
+    const JUMP_POWER = 17.4;
+    const GRAVITY = 0.62;
+    const COYOTE_FRAMES = 8;
+    const MAX_FALL = 15;
+    const INVULN_FRAMES = 70;
+
+    const WORLD = {
+      width: 3180,
+      height: 860,
+      groundY: 736
+    };
+
+    const LEVEL_PLATFORMS = [
+      { x: -100, y: 736, w: 520, h: 140, type: "ground" },
+      { x: 540, y: 736, w: 270, h: 140, type: "ground" },
+      { x: 930, y: 736, w: 280, h: 140, type: "ground" },
+      { x: 1330, y: 736, w: 330, h: 140, type: "ground" },
+      { x: 1790, y: 736, w: 310, h: 140, type: "ground" },
+      { x: 2210, y: 736, w: 260, h: 140, type: "ground" },
+      { x: 2590, y: 736, w: 650, h: 140, type: "ground" },
+
+      { x: 220, y: 626, w: 150, h: 22, type: "log" },
+      { x: 470, y: 578, w: 120, h: 22, type: "log" },
+      { x: 700, y: 518, w: 120, h: 22, type: "log" },
+      { x: 880, y: 468, w: 130, h: 22, type: "log" },
+      { x: 1080, y: 418, w: 130, h: 22, type: "log" },
+      { x: 1265, y: 518, w: 120, h: 22, type: "log" },
+      { x: 1480, y: 455, w: 150, h: 22, type: "log" },
+      { x: 1690, y: 392, w: 130, h: 22, type: "log" },
+      { x: 1875, y: 500, w: 120, h: 22, type: "log" },
+      { x: 2045, y: 438, w: 130, h: 22, type: "log" },
+      { x: 2210, y: 372, w: 130, h: 22, type: "log" },
+      { x: 2380, y: 508, w: 120, h: 22, type: "log" },
+      { x: 2525, y: 454, w: 130, h: 22, type: "log" },
+      { x: 2700, y: 398, w: 145, h: 22, type: "log" },
+      { x: 2885, y: 346, w: 150, h: 22, type: "log" }
+    ];
+
+    const EGG_SPAWNS = [
+      { x: 250, y: 582 },
+      { x: 505, y: 534 },
+      { x: 735, y: 474 },
+      { x: 1115, y: 374 },
+      { x: 1515, y: 411 },
+      { x: 1730, y: 348 },
+      { x: 2078, y: 394 },
+      { x: 2245, y: 328 },
+      { x: 2558, y: 410 },
+      { x: 2920, y: 302 }
+    ];
+
+    const ENEMY_SPAWNS = [
+      { x: 630, y: 700, minX: 570, maxX: 760, speed: 1.2, type: "chick" },
+      { x: 1055, y: 700, minX: 965, maxX: 1165, speed: 1.45, type: "fox" },
+      { x: 1540, y: 700, minX: 1365, maxX: 1610, speed: 1.4, type: "chick" },
+      { x: 1540, y: 419, minX: 1485, maxX: 1600, speed: 1.05, type: "cloudbat" },
+      { x: 1940, y: 464, minX: 1885, maxX: 1985, speed: 1.3, type: "fox" },
+      { x: 2295, y: 336, minX: 2215, maxX: 2335, speed: 1.2, type: "cloudbat" },
+      { x: 2760, y: 362, minX: 2705, maxX: 2840, speed: 1.55, type: "fox" }
+    ];
+
+    const HAZARDS = [
+      { x: 450, y: 716, w: 54, h: 20, type: "spikes" },
+      { x: 855, y: 716, w: 48, h: 20, type: "spikes" },
+      { x: 1235, y: 716, w: 48, h: 20, type: "spikes" },
+      { x: 1715, y: 716, w: 52, h: 20, type: "spikes" },
+      { x: 2145, y: 716, w: 44, h: 20, type: "spikes" },
+      { x: 2485, y: 716, w: 60, h: 20, type: "spikes" },
+      { x: 2860, y: 716, w: 48, h: 20, type: "spikes" }
+    ];
+
+    const CHECKPOINTS = [480, 1320, 2220, 2780];
+    const GOAL = { x: 3025, y: 256, w: 100, h: 112 };
+
+    // =========================================
+    // Setup
+    // =========================================
+    document.title = GAME_TITLE;
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const eggCounter = document.getElementById("eggCounter");
+    const tipText = document.getElementById("tipText");
+    const startOverlay = document.getElementById("startOverlay");
+    const winOverlay = document.getElementById("winOverlay");
+    const clueText = document.getElementById("clueText");
+    const startBtn = document.getElementById("startBtn");
+    const playAgainBtn = document.getElementById("playAgainBtn");
+
+    const controls = { left: false, right: false, jumpHeld: false, jumpQueued: false };
+
+    let cameraX = 0;
+    let gameState = "start";
+    let eggs = [];
+    let flowers = [];
+    let enemies = [];
+    let sparkles = [];
+    let respawnPoint = { x: 40, y: 618 };
+
+    const player = {
+      x: 40,
+      y: 618,
+      w: 46,
+      h: 54,
+      vx: 0,
+      vy: 0,
+      facing: 1,
+      onGround: false,
+      coyote: 0,
+      hopBob: 0,
+      invuln: 0,
+      knockback: 0,
+      hits: 0
+    };
+
+    function buildFlowers() {
+      flowers = [];
+      for (let i = 0; i < 64; i++) {
+        const x = 20 + i * 50 + (i % 3) * 11;
+        flowers.push({ x, y: WORLD.groundY - 4, type: i % 5 });
+      }
+    }
+
+    function resetGame() {
+      player.x = 40;
+      player.y = 618;
+      player.vx = 0;
+      player.vy = 0;
+      player.facing = 1;
+      player.onGround = false;
+      player.coyote = 0;
+      player.hopBob = 0;
+      player.invuln = 0;
+      player.knockback = 0;
+      player.hits = 0;
+      cameraX = 0;
+      respawnPoint = { x: 40, y: 618 };
+      eggs = EGG_SPAWNS.map((egg, i) => ({ ...egg, collected: false, wobble: i * 0.7 }));
+      enemies = ENEMY_SPAWNS.map((enemy, i) => ({ ...enemy, dir: i % 2 ? -1 : 1, bob: i * 0.9 }));
+      sparkles = [];
+      buildFlowers();
+      updateHud();
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function updateHud() {
+      const collected = eggs.filter(e => e.collected).length;
+      eggCounter.textContent = `Eggs ${collected} / ${eggs.length}`;
+      const allCollected = collected === eggs.length;
+      if (allCollected) {
+        tipText.textContent = "All eggs found. Survive the last stretch and hop into the basket.";
+      } else if (player.hits === 0) {
+        tipText.textContent = "This version bites back. Dodge baddies and prickly bits.";
+      } else {
+        tipText.textContent = `Ouch count ${player.hits}. Checkpoints help. Pride less so.`;
+      }
+    }
+
+    function setControl(name, pressed) {
+      if (name === "jump") {
+        if (pressed && !controls.jumpHeld) controls.jumpQueued = true;
+        controls.jumpHeld = pressed;
+      } else {
+        controls[name] = pressed;
+      }
+      document.querySelectorAll(`[data-control="${name}"]`).forEach(btn => {
+        btn.classList.toggle("active", pressed);
+      });
+    }
+
+    function bindButton(button, name) {
+      const start = (event) => {
+        event.preventDefault();
+        if (gameState === "playing") setControl(name, true);
+      };
+      const end = (event) => {
+        event.preventDefault();
+        setControl(name, false);
+      };
+      button.addEventListener("pointerdown", start);
+      button.addEventListener("pointerup", end);
+      button.addEventListener("pointercancel", end);
+      button.addEventListener("pointerleave", end);
+      button.addEventListener("lostpointercapture", end);
+    }
+
+    document.querySelectorAll("[data-control]").forEach(btn => bindButton(btn, btn.dataset.control));
+
+    if (SHOW_KEYBOARD_SUPPORT) {
+      window.addEventListener("keydown", (e) => {
+        if (gameState !== "playing") return;
+        if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") setControl("left", true);
+        if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") setControl("right", true);
+        if (e.key === "ArrowUp" || e.key.toLowerCase() === "w" || e.key === " ") setControl("jump", true);
+      });
+      window.addEventListener("keyup", (e) => {
+        if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") setControl("left", false);
+        if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") setControl("right", false);
+        if (e.key === "ArrowUp" || e.key.toLowerCase() === "w" || e.key === " ") setControl("jump", false);
+      });
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    function spawnBurst(x, y, color) {
+      for (let i = 0; i < 8; i++) {
+        sparkles.push({
+          x, y,
+          vx: Math.cos((Math.PI * 2 * i) / 8) * (1.2 + Math.random() * 1.1),
+          vy: Math.sin((Math.PI * 2 * i) / 8) * (1.2 + Math.random() * 1.1) - 1,
+          life: 24 + Math.floor(Math.random() * 8),
+          color
+        });
+      }
+    }
+
+    function hurtPlayer(sourceX) {
+      if (player.invuln > 0) return;
+      player.hits++;
+      player.invuln = INVULN_FRAMES;
+      player.vx = sourceX < player.x ? 5.2 : -5.2;
+      player.vy = -8.5;
+      spawnBurst(player.x + player.w / 2, player.y + 20, "#ff8db8");
+      updateHud();
+      // Respawn after a brief dramatic pause. Not too dramatic.
+      setTimeout(() => {
+        if (gameState !== "playing") return;
+        player.x = respawnPoint.x;
+        player.y = respawnPoint.y;
+        player.vx = 0;
+        player.vy = 0;
+        player.onGround = false;
+      }, 120);
+    }
+
+    function updateRespawn() {
+      CHECKPOINTS.forEach(cp => {
+        if (player.x > cp && respawnPoint.x < cp - 20) {
+          respawnPoint = { x: cp, y: 618 };
+          spawnBurst(cp + 10, 610, "#fff0a8");
+        }
+      });
+    }
+
+    function updateEnemies() {
+      enemies.forEach(enemy => {
+        enemy.x += enemy.speed * enemy.dir;
+        if (enemy.x < enemy.minX || enemy.x > enemy.maxX) {
+          enemy.dir *= -1;
+          enemy.x = Math.max(enemy.minX, Math.min(enemy.x, enemy.maxX));
+        }
+        enemy.bob += 0.06;
+
+        const box = enemy.type === "cloudbat"
+          ? { x: enemy.x - 18, y: enemy.y - 16 + Math.sin(enemy.bob) * 8, w: 36, h: 28 }
+          : { x: enemy.x - 20, y: enemy.y - 30, w: 40, h: 30 };
+
+        if (rectsOverlap(player, box)) {
+          const stomp = player.vy > 1.5 && player.y + player.h - 6 < box.y + 12;
+          if (stomp) {
+            player.vy = -9.5;
+            enemy.dir *= -1;
+            spawnBurst(box.x + box.w / 2, box.y + 10, "#c9f7d6");
+          } else {
+            hurtPlayer(box.x + box.w / 2);
+          }
+        }
+      });
+    }
+
+    function updateSparkles() {
+      sparkles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.04;
+        p.life--;
+      });
+      sparkles = sparkles.filter(p => p.life > 0);
+    }
+
+    function update() {
+      const moving = Number(controls.right) - Number(controls.left);
+      const moveSpeed = player.invuln > 0 ? PLAYER_SPEED * 0.96 : PLAYER_SPEED;
+      player.vx = moving * moveSpeed;
+      if (moving !== 0) player.facing = moving > 0 ? 1 : -1;
+
+      if (player.onGround) player.coyote = COYOTE_FRAMES;
+      else if (player.coyote > 0) player.coyote--;
+
+      if (controls.jumpQueued && player.coyote > 0) {
+        player.vy = -JUMP_POWER;
+        player.onGround = false;
+        player.coyote = 0;
+      }
+      controls.jumpQueued = false;
+
+      player.vy += GRAVITY;
+      if (player.vy > MAX_FALL) player.vy = MAX_FALL;
+      if (player.invuln > 0) player.invuln--;
+
+      player.x += player.vx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.w > WORLD.width) player.x = WORLD.width - player.w;
+
+      const previousY = player.y;
+      player.y += player.vy;
+      player.onGround = false;
+
+      for (const platform of LEVEL_PLATFORMS) {
+        const wasAbove = previousY + player.h <= platform.y + 6;
+        const nowBelowTop = player.y + player.h >= platform.y;
+        const horizontalHit = player.x + player.w > platform.x + 6 && player.x < platform.x + platform.w - 6;
+        if (wasAbove && nowBelowTop && horizontalHit && player.vy >= 0 && player.y + player.h <= platform.y + platform.h + 18) {
+          player.y = platform.y - player.h;
+          player.vy = 0;
+          player.onGround = true;
+        }
+      }
+
+      if (player.y > WORLD.height + 100) {
+        hurtPlayer(player.x);
+        player.x = respawnPoint.x;
+        player.y = respawnPoint.y;
+        player.vx = 0;
+        player.vy = 0;
+      }
+
+      player.hopBob += Math.abs(player.vx) * 0.1;
+      updateRespawn();
+      updateEnemies();
+      updateSparkles();
+
+      for (const hazard of HAZARDS) {
+        const box = { x: hazard.x, y: hazard.y, w: hazard.w, h: hazard.h };
+        if (rectsOverlap(player, box)) {
+          hurtPlayer(hazard.x + hazard.w / 2);
+        }
+      }
+
+      for (const egg of eggs) {
+        egg.wobble += 0.03;
+        if (!egg.collected) {
+          const box = { x: egg.x - 14, y: egg.y - 18, w: 28, h: 36 };
+          if (rectsOverlap(player, box)) {
+            egg.collected = true;
+            spawnBurst(egg.x, egg.y, "#fff0a8");
+            updateHud();
+          }
+        }
+      }
+
+      const allCollected = eggs.every(e => e.collected);
+      if (allCollected && rectsOverlap(player, GOAL)) {
+        winGame();
+        return;
+      }
+
+      const viewW = canvas.clientWidth;
+      cameraX = player.x - viewW * 0.35;
+      cameraX = Math.max(0, Math.min(cameraX, WORLD.width - viewW));
+    }
+
+    function drawSky() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 232, 167, 0.75)";
+      ctx.arc(w - 80, 72, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      const cloudBase = [
+        { x: 90, y: 90, scale: 1 },
+        { x: 300, y: 130, scale: 0.8 },
+        { x: 600, y: 82, scale: 1.15 },
+        { x: 900, y: 128, scale: 0.9 },
+        { x: 1220, y: 92, scale: 1.05 },
+        { x: 1560, y: 135, scale: 0.92 },
+        { x: 1900, y: 100, scale: 1.1 },
+        { x: 2450, y: 112, scale: 1.0 },
+        { x: 2840, y: 86, scale: 0.95 }
+      ];
+      cloudBase.forEach(cloud => {
+        const x = cloud.x - cameraX * 0.18;
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        drawCloud(x, cloud.y, cloud.scale);
+      });
+    }
+
+    function drawCloud(x, y, s) {
+      ctx.beginPath();
+      ctx.arc(x, y, 20 * s, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(x + 24 * s, y - 10 * s, 22 * s, Math.PI, Math.PI * 2);
+      ctx.arc(x + 52 * s, y, 20 * s, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawHills() {
+      const h = canvas.clientHeight;
+      const layers = [
+        { color: "#d8f0df", bump: 32, height: 150, offset: 0.16 },
+        { color: "#c4ead0", bump: 42, height: 120, offset: 0.24 },
+        { color: "#b3e1c2", bump: 24, height: 92, offset: 0.34 }
+      ];
+
+      layers.forEach((layer, index) => {
+        ctx.fillStyle = layer.color;
+        ctx.beginPath();
+        ctx.moveTo(0, h);
+        for (let x = -120; x <= canvas.clientWidth + 120; x += 120) {
+          const worldX = x + cameraX * layer.offset;
+          const y = h - layer.height - Math.sin((worldX / 140) + index) * layer.bump;
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(canvas.clientWidth, h);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+
+    function drawGroundDecor() {
+      flowers.forEach((flower, i) => {
+        const x = flower.x - cameraX;
+        if (x < -20 || x > canvas.clientWidth + 20) return;
+        const y = flower.y;
+        ctx.strokeStyle = "#73c98d";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y - 16 - (i % 3) * 2);
+        ctx.stroke();
+
+        const petalSets = ["#ffcadf", "#ffd9a7", "#d8c7ff", "#fff4a8", "#ffcce8"];
+        const cy = y - 18 - (i % 3) * 2;
+        ctx.fillStyle = petalSets[flower.type];
+        [[0,-5],[5,0],[0,5],[-5,0]].forEach(([dx, dy]) => {
+          ctx.beginPath();
+          ctx.arc(x + dx, cy + dy, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.fillStyle = "#ffdd6b";
+        ctx.beginPath();
+        ctx.arc(x, cy, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function roundRect(context, x, y, w, h, r, fill) {
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.arcTo(x + w, y, x + w, y + h, r);
+      context.arcTo(x + w, y + h, x, y + h, r);
+      context.arcTo(x, y + h, x, y, r);
+      context.arcTo(x, y, x + w, y, r);
+      context.closePath();
+      context.fillStyle = fill;
+      context.fill();
+    }
+
+    function drawPlatforms() {
+      LEVEL_PLATFORMS.forEach(platform => {
+        const x = platform.x - cameraX;
+        if (x + platform.w < -60 || x > canvas.clientWidth + 60) return;
+        if (platform.type === "ground") {
+          ctx.fillStyle = "#bdeac8";
+          ctx.fillRect(x, platform.y, platform.w, platform.h);
+          ctx.fillStyle = "#9ed7ae";
+          ctx.fillRect(x, platform.y, platform.w, 18);
+        } else {
+          roundRect(ctx, x, platform.y, platform.w, platform.h, 12, "#b18168");
+          roundRect(ctx, x + 6, platform.y + 4, platform.w - 12, platform.h - 8, 10, "#c89578");
+        }
+      });
+    }
+
+    function drawHazards() {
+      HAZARDS.forEach(hazard => {
+        const x = hazard.x - cameraX;
+        if (x + hazard.w < -20 || x > canvas.clientWidth + 20) return;
+        for (let i = 0; i < Math.floor(hazard.w / 12); i++) {
+          ctx.beginPath();
+          ctx.moveTo(x + i * 12, hazard.y + hazard.h);
+          ctx.lineTo(x + i * 12 + 6, hazard.y);
+          ctx.lineTo(x + i * 12 + 12, hazard.y + hazard.h);
+          ctx.closePath();
+          ctx.fillStyle = i % 2 ? "#ff9abf" : "#ffb3cf";
+          ctx.fill();
+        }
+      });
+    }
+
+    function drawEggs() {
+      eggs.forEach(egg => {
+        if (egg.collected) return;
+        const x = egg.x - cameraX;
+        const y = egg.y + Math.sin(egg.wobble) * 3;
+        if (x < -30 || x > canvas.clientWidth + 30) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 13, 17, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff3a8";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(95,75,83,0.18)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = "#ff91c0";
+        ctx.fillRect(-7, -4, 14, 4);
+        ctx.fillStyle = "#9ad2ff";
+        ctx.beginPath();
+        ctx.arc(0, 5, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function drawEnemies() {
+      enemies.forEach(enemy => {
+        const yBob = enemy.type === "cloudbat" ? Math.sin(enemy.bob) * 8 : 0;
+        const x = enemy.x - cameraX;
+        const y = enemy.y + yBob;
+        if (x < -50 || x > canvas.clientWidth + 50) return;
+        ctx.save();
+        ctx.translate(x, y);
+        if (enemy.dir < 0) ctx.scale(-1, 1);
+
+        if (enemy.type === "chick") {
+          ctx.fillStyle = "#ffe58e";
+          ctx.beginPath();
+          ctx.arc(0, -10, 14, 0, Math.PI * 2);
+          ctx.arc(0, 5, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffb066";
+          ctx.beginPath();
+          ctx.moveTo(10, -10); ctx.lineTo(20, -6); ctx.lineTo(10, -2); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "#5f4b53";
+          ctx.beginPath(); ctx.arc(5, -12, 1.8, 0, Math.PI * 2); ctx.fill();
+        } else if (enemy.type === "cloudbat") {
+          ctx.fillStyle = "#cdbaf8";
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(-14, -2, 11, 6, -0.3, 0, Math.PI * 2);
+          ctx.ellipse(14, -2, 11, 6, 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#5f4b53";
+          ctx.beginPath(); ctx.arc(-4, -1, 1.5, 0, Math.PI * 2); ctx.arc(4, -1, 1.5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillStyle = "#f5a3b9";
+          ctx.beginPath();
+          ctx.ellipse(0, 2, 18, 13, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#fff7fb";
+          ctx.beginPath();
+          ctx.arc(10, -8, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#5f4b53";
+          ctx.beginPath(); ctx.arc(12, -9, 1.4, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#fff0f5";
+          ctx.fillRect(-8, 12, 16, 4);
+        }
+        ctx.restore();
+      });
+    }
+
+    function drawCheckpoints() {
+      CHECKPOINTS.forEach(cp => {
+        const x = cp - cameraX;
+        if (x < -30 || x > canvas.clientWidth + 30) return;
+        const active = respawnPoint.x >= cp;
+        ctx.fillStyle = active ? "#fff0a8" : "#ffe5f1";
+        ctx.fillRect(x, 642, 8, 94);
+        ctx.beginPath();
+        ctx.moveTo(x + 8, 644);
+        ctx.lineTo(x + 34, 654);
+        ctx.lineTo(x + 8, 664);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+
+    function drawGoal() {
+      const x = GOAL.x - cameraX;
+      const y = GOAL.y;
+      const allCollected = eggs.every(e => e.collected);
+      if (x + GOAL.w < -40 || x > canvas.clientWidth + 40) return;
+      roundRect(ctx, x + 8, y + 48, 74, 42, 16, "#c68b59");
+      ctx.strokeStyle = "#9d6e48";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x + 45, y + 48, 28, Math.PI, 0);
+      ctx.stroke();
+      ctx.fillStyle = allCollected ? "#8fe6a7" : "#ff9ec9";
+      ctx.fillRect(x + 33, y + 6, 8, 34);
+      ctx.beginPath();
+      ctx.moveTo(x + 41, y + 8);
+      ctx.lineTo(x + 76, y + 18);
+      ctx.lineTo(x + 41, y + 28);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawSparkles() {
+      sparkles.forEach(p => {
+        ctx.globalAlpha = Math.max(0, p.life / 30);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x - cameraX, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlayer() {
+      if (player.invuln > 0 && Math.floor(player.invuln / 6) % 2 === 0) return;
+      const x = player.x - cameraX;
+      const y = player.y;
+      const bob = player.onGround ? Math.sin(player.hopBob) * 1.5 : 0;
+      ctx.save();
+      ctx.translate(x + player.w / 2, y + player.h / 2 + bob);
+      if (player.facing < 0) ctx.scale(-1, 1);
+      ctx.fillStyle = "#fff7fb";
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 18, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -12, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-8, -34, 6, 16, -0.18, 0, Math.PI * 2);
+      ctx.ellipse(8, -34, 6, 16, 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffc9de";
+      ctx.beginPath();
+      ctx.ellipse(-8, -34, 2.5, 10, -0.18, 0, Math.PI * 2);
+      ctx.ellipse(8, -34, 2.5, 10, 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#5f4b53";
+      ctx.beginPath();
+      ctx.arc(-5, -13, 1.9, 0, Math.PI * 2);
+      ctx.arc(5, -13, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ff97bb";
+      ctx.beginPath();
+      ctx.arc(0, -9, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff0f5";
+      ctx.beginPath();
+      ctx.ellipse(-7, 27, 6, 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(7, 27, 6, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      drawSky();
+      drawHills();
+      drawPlatforms();
+      drawHazards();
+      drawCheckpoints();
+      drawGroundDecor();
+      drawEggs();
+      drawEnemies();
+      drawGoal();
+      drawSparkles();
+      drawPlayer();
+    }
+
+    function tick() {
+      if (gameState === "playing") {
+        update();
+        draw();
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function startGame() {
+      resetGame();
+      gameState = "playing";
+      startOverlay.hidden = true;
+      winOverlay.hidden = true;
+      clueText.textContent = WIN_CLUE;
+      draw();
+    }
+
+    function winGame() {
+      gameState = "won";
+      clueText.textContent = WIN_CLUE;
+      winOverlay.hidden = false;
+    }
+
+    startBtn.addEventListener("click", startGame);
+    playAgainBtn.addEventListener("click", startGame);
+    window.addEventListener("resize", () => { resizeCanvas(); draw(); });
+
+    resizeCanvas();
+    resetGame();
+    draw();
+    requestAnimationFrame(tick);
+  </script>
+
+</body>
+</html>
